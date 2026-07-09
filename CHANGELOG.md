@@ -6,6 +6,8 @@ All notable changes to Margins are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-07-09
+
 ### Added
 - YAML frontmatter: a leading `---` block is rendered as a metadata panel
   (key/value pairs) instead of leaking in as a rule + paragraph. Simple
@@ -48,7 +50,8 @@ All notable changes to Margins are documented here. The format is based on
   reload, light/dark themes, robust file handling, and a signed + notarized DMG
   plus a Homebrew cask.
 
-[Unreleased]: https://github.com/Chrismacolor/margins/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/Chrismacolor/margins/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/Chrismacolor/margins/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/Chrismacolor/margins/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/Chrismacolor/margins/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/Chrismacolor/margins/compare/v1.0.0...v1.0.1
