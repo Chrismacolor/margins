@@ -1,0 +1,71 @@
+#!/bin/sh
+#
+# margins — command-line launcher for Margins.app.
+#
+# Ships inside the app bundle at Contents/Resources/margins-cli; the Homebrew
+# cask symlinks it into PATH as `margins`. Never edit this file inside an
+# installed bundle — the bundle is code-signed and any change breaks the seal.
+#
+#   margins <file.md> ...     open Markdown file(s) in Margins
+#   some-cmd | margins [-]    render piped Markdown, streaming as it arrives
+#   margins --help|--version
+
+set -eu
+
+BUNDLE_ID="com.disanto.margins"
+
+usage() {
+  cat <<'EOF'
+usage: margins <file.md> ...     open Markdown file(s) in Margins
+       some-cmd | margins [-]    render piped Markdown (streams live as the
+                                 pipe fills; turn on the Follow pill to keep
+                                 the newest output in view)
+       margins --help            show this help
+       margins --version         print the app version
+
+Margins shows one document per window request; with multiple files only the
+first is displayed.
+EOF
+}
+
+version() {
+  self="$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")"
+  plist="$(dirname "$self")/../Info.plist"
+  if v="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist" 2>/dev/null)"; then
+    printf '%s\n' "$v"
+  else
+    printf 'unknown\n'
+  fi
+}
+
+# Bundle id first (works even if the app was renamed); `-a` fallback covers
+# dev builds that LaunchServices hasn't registered yet.
+open_app() {
+  open -b "$BUNDLE_ID" "$@" 2>/dev/null || open -a "Margins" "$@"
+}
+
+case "${1:-}" in
+  -h|--help) usage; exit 0 ;;
+  --version) version; exit 0 ;;
+esac
+
+if [ "${1:-}" = "-" ] || { [ $# -eq 0 ] && [ ! -t 0 ]; }; then
+  # Spool stdin into a watched temp file. Open it first (empty), then append:
+  # each write fires the app's file watcher, so content renders as it arrives.
+  # macOS mktemp has no --suffix; a fixed name inside a temp dir gives the
+  # .md extension and a clean window title. The file is left for the system's
+  # periodic TMPDIR purge — the app may still be reading it after we exit.
+  dir="$(mktemp -d "${TMPDIR:-/tmp}/margins.XXXXXX")"
+  file="$dir/stdin.md"
+  : > "$file"
+  open_app "$file"
+  cat >> "$file"
+  exit 0
+fi
+
+if [ $# -eq 0 ]; then
+  usage >&2
+  exit 64
+fi
+
+open_app "$@"

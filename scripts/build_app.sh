@@ -43,6 +43,8 @@ cp "$INFO_PLIST" "$APP_DIR/Contents/Info.plist"
 if [[ -f "$ICON_FILE" ]]; then
   cp "$ICON_FILE" "$RESOURCES_DIR/AppIcon.icns"
 fi
+cp "$ROOT_DIR/Resources/margins-cli" "$RESOURCES_DIR/margins-cli"
+chmod +x "$RESOURCES_DIR/margins-cli"
 chmod +x "$BIN_DIR/$APP_NAME"
 
 # Stamp version/build into the bundled Info.plist (not the source file).

@@ -23,6 +23,7 @@ cask "margins" do
   depends_on macos: :ventura
 
   app "Margins.app"
+  binary "#{appdir}/Margins.app/Contents/Resources/margins-cli", target: "margins"
 
   zap trash: [
     "~/Library/Preferences/com.disanto.margins.plist",
