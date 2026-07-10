@@ -6,6 +6,16 @@ All notable changes to Margins are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Follow mode**: a Follow pill in the header keeps the end of the document
+  in view as the file grows — made for watching AI tools stream output into a
+  file. Scrolling up detaches; the pill re-attaches. Follow implies Live.
+- **`margins` CLI**: a small launcher shipped inside the app bundle (linked
+  into PATH by the Homebrew cask). `margins file.md` opens files;
+  `some-cmd | margins -` renders piped Markdown, streaming live as it arrives.
+- **Task lists**: `- [ ]` / `- [x]` items render with read-only checkboxes;
+  the per-block copy button preserves the `[x]` state.
+
 ## [1.0.4] - 2026-07-09
 
 ### Added

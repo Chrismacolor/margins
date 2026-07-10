@@ -16,6 +16,12 @@ A native Markdown reader for macOS. It opens `.md` files instantly, renders them
 with clean typography, and does nothing else. No web view, no bundled
 JavaScript, no plugins, no setup.
 
+More and more of the Markdown on a Mac isn't written by people — agents, chat
+CLIs, and on-device models produce it constantly. Margins is the quick,
+no-frills window to read it in: point it at a file and watch it render live
+while the model writes, or pipe output straight into a window
+(see [AI workflows](#ai-workflows)).
+
 <p align="center">
   <img src="docs/screenshot.png" alt="Margins rendering a Markdown document" width="720">
 </p>
@@ -26,12 +32,15 @@ JavaScript, no plugins, no setup.
 - **Private & offline** — your files never leave your machine; no analytics.
 - **Dark / light** — follows the macOS appearance, with a manual override.
 - **Live reload** — edits on disk update the view instantly (toggle in the header).
+- **Follow** — auto-scrolls as a file grows, so you can watch an AI tool write.
+- **Terminal-friendly** — a `margins` command opens files or renders piped output.
 - **Find** — `⌘F` searches the document with match highlighting and quick navigation.
 - **Frontmatter** — YAML metadata (`---` blocks) renders as a tidy properties panel.
+- **Task lists** — `- [ ]` / `- [x]` items render with checkboxes (read-only).
 
 Margins is deliberately minimal. If you want Mermaid diagrams, LaTeX, PDF export,
-and a dozen themes, other viewers do that — Margins is for people who just want
-to read Markdown, cleanly and natively.
+and a dozen themes, other viewers do that — Margins is for reading Markdown,
+cleanly and natively, whether a person wrote it or a model did.
 
 ## Install
 
@@ -48,6 +57,8 @@ Pick one of the two options below.
    ```
 3. Launch **Margins** from Spotlight or `/Applications`.
 
+Homebrew also links the `margins` command into your PATH.
+
 To update later: `brew upgrade`.
 
 ### Option B — Direct download
@@ -61,6 +72,12 @@ To update later: `brew upgrade`.
 The app is signed and notarized, so it opens without Gatekeeper warnings. To
 update, download a newer `.dmg` and repeat.
 
+To get the `margins` command without Homebrew:
+
+```bash
+sudo ln -s /Applications/Margins.app/Contents/Resources/margins-cli /usr/local/bin/margins
+```
+
 ## Open Markdown
 
 Open a file any of these ways:
@@ -68,6 +85,8 @@ Open a file any of these ways:
 1. In Margins, click **Open** in the toolbar and choose a file.
 2. In Finder, right-click a `.md` file → **Open With → Margins**.
 3. Drag a `.md` file onto the Margins window.
+4. From the terminal: `margins notes.md` (or pipe into it — see
+   [AI workflows](#ai-workflows)).
 
 Supported extensions: `.md`, `.markdown`, `.mdown`.
 
@@ -76,6 +95,33 @@ Supported extensions: `.md`, `.markdown`, `.mdown`.
 1. In Finder, right-click any `.md` file → **Get Info**.
 2. Under **Open with**, choose **Margins**.
 3. Click **Change All…** to apply it to every `.md` file.
+
+## AI workflows
+
+AI tools produce a lot of Markdown; Margins is built to be the fast, native
+window you read it in.
+
+**Watch an agent write.** Point Margins at the file your tool is writing and
+turn on the **Follow** pill — the view sticks to the end as new content lands
+(scroll up to detach, click the pill to re-attach; Follow turns Live reload on
+for you):
+
+```bash
+claude -p "Summarize this repo" > notes.md &
+margins notes.md
+```
+
+**Pipe straight in.** Anything that prints Markdown can stream into a Margins
+window — output renders live as the pipe fills:
+
+```bash
+some-ai-tool | margins -
+```
+
+This pairs nicely with on-device generators like Apple's
+[`fm` CLI / Foundation Models SDK](https://github.com/apple/python-apple-fm-sdk):
+stream a local model's output into a rendered, readable page instead of a
+scrolling terminal.
 
 ## Build from source
 
