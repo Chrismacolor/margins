@@ -47,6 +47,8 @@ struct ListItem: Identifiable {
     let indent: Int
     let marker: String
     let inline: AttributedString
+    /// GFM task-list state: nil for a normal item, true/false for `[x]`/`[ ]`.
+    let checkbox: Bool?
 }
 
 /// A single `key: value` pair from a YAML frontmatter block (value flattened
@@ -377,9 +379,13 @@ struct MarkdownRenderer {
             guard let item = parseListItem(lines[index]) else { break }
             switch item {
             case let .unordered(indent, text):
-                rows.append(ListItem(indent: indent, marker: "•", inline: parseInline(text)))
+                if let task = taskCheckbox(text) {
+                    rows.append(ListItem(indent: indent, marker: "•", inline: parseInline(task.remainder), checkbox: task.checked))
+                } else {
+                    rows.append(ListItem(indent: indent, marker: "•", inline: parseInline(text), checkbox: nil))
+                }
             case let .ordered(indent, number, text):
-                rows.append(ListItem(indent: indent, marker: "\(number).", inline: parseInline(text)))
+                rows.append(ListItem(indent: indent, marker: "\(number).", inline: parseInline(text), checkbox: nil))
             }
             index += 1
         }
@@ -405,6 +411,21 @@ struct MarkdownRenderer {
         let number = prefix.split(separator: ".").first.map(String.init) ?? "1"
         let text = String(trimmed[range.upperBound...]).trimmingCharacters(in: .whitespaces)
         return .ordered(indent: indent, number: number, text: text)
+    }
+
+    /// Detects a GFM task-list prefix on an unordered item's text. Returns the
+    /// checked state plus the text with the `[ ] `/`[x] ` marker stripped, or
+    /// nil when the item is not a task (GFM requires whitespace after `]`).
+    private static func taskCheckbox(_ text: String) -> (checked: Bool, remainder: String)? {
+        for (prefix, checked) in [("[ ]", false), ("[x]", true), ("[X]", true)] {
+            if text == prefix {
+                return (checked, "")
+            }
+            if text.hasPrefix(prefix + " ") {
+                return (checked, String(text.dropFirst(prefix.count + 1)))
+            }
+        }
+        return nil
     }
 
     // MARK: Paragraphs

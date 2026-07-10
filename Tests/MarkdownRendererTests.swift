@@ -39,6 +39,7 @@ struct TestRunner {
         testTable()
         testCallout()
         testLists()
+        testTaskLists()
         testHorizontalRule()
         testParagraphTableBoundary()
         testEmpty()
@@ -124,6 +125,29 @@ struct TestRunner {
         } else { check(false, "ordered list block") }
     }
 
+    static func testTaskLists() {
+        print("Task lists")
+        let doc = "- [ ] open\n- [x] done\n- [X] DONE\n- plain\n- [ ]\n  - [ ] child"
+        if case let .list(items) = MarkdownRenderer.parse(doc)[0].block {
+            check(items.count == 6, "one block of six items")
+            check(items.map(\.checkbox) == [false, true, true, nil, false, false], "checkbox states")
+            check(plain(items[0].inline) == "open", "unchecked prefix stripped")
+            check(plain(items[1].inline) == "done", "checked prefix stripped")
+            check(plain(items[3].inline) == "plain", "plain sibling untouched")
+            check(plain(items[4].inline).isEmpty, "empty task item allowed")
+            check(items[5].indent == 1, "nested task keeps indent")
+            check(items.allSatisfy { $0.marker == "•" }, "markers stay bullets")
+        } else { check(false, "task list block") }
+
+        let notTasks = MarkdownRenderer.parse("- [y] nope\n- [ ]tight\n1. [ ] ordered")
+        if case let .list(items) = notTasks[0].block {
+            check(items.map(\.checkbox) == [nil, nil, nil], "near-misses are not tasks")
+            check(plain(items[0].inline) == "[y] nope", "unknown bracket kept literal")
+            check(plain(items[1].inline) == "[ ]tight", "missing space kept literal")
+            check(plain(items[2].inline) == "[ ] ordered", "ordered item keeps brackets")
+        } else { check(false, "near-miss list block") }
+    }
+
     static func testHorizontalRule() {
         print("Horizontal rule")
         let blocks = MarkdownRenderer.parse("above\n\n---\n\nbelow")
@@ -191,6 +215,10 @@ struct TestRunner {
         let list = blocks.first { blockKind($0.block) == "list" }!.block
         check(plainText(of: list).contains("one") && plainText(of: list).contains("two"),
               "list plain text includes each item")
+
+        let tasks = MarkdownRenderer.parse("- [x] done\n- [ ] open")[0].block
+        check(plainText(of: tasks) == "• [x] done\n• [ ] open",
+              "task list copies with checkbox state")
 
         let table = blocks.first { blockKind($0.block) == "table" }!.block
         check(plainText(of: table).contains("\t"), "table cells are tab-separated")

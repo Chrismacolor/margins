@@ -41,8 +41,9 @@ func plainText(of block: MarkdownBlock) -> String {
         return String(inline.characters)
     case let .list(items):
         return items.map { item in
-            String(repeating: "    ", count: max(0, item.indent))
-                + item.marker + " " + String(item.inline.characters)
+            let task = item.checkbox.map { $0 ? "[x] " : "[ ] " } ?? ""
+            return String(repeating: "    ", count: max(0, item.indent))
+                + item.marker + " " + task + String(item.inline.characters)
         }.joined(separator: "\n")
     case let .code(_, rawLines):
         return rawLines.joined(separator: "\n")

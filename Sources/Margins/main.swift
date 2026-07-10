@@ -475,9 +475,8 @@ private struct ListView: View {
         VStack(alignment: .leading, spacing: 5) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(row.marker)
+                    markerView(for: row)
                         .font(.system(size: FontSize.body))
-                        .foregroundStyle(theme.textMuted)
                         .frame(minWidth: 14, alignment: .trailing)
                     Text(withFindHighlights(
                         styledInline(row.inline, size: FontSize.body, baseColor: theme.text, theme: theme),
@@ -489,6 +488,16 @@ private struct ListView: View {
                 .padding(.leading, CGFloat(row.indent) * 18)
             }
         }
+    }
+
+    /// Bullet/number text, or a checkbox symbol for task items. Wrapping the
+    /// Image in Text keeps a real baseline for the .firstTextBaseline HStack.
+    private func markerView(for row: ListItem) -> Text {
+        if let checked = row.checkbox {
+            return Text(Image(systemName: checked ? "checkmark.square.fill" : "square"))
+                .foregroundColor(checked ? theme.accent : theme.textMuted)
+        }
+        return Text(row.marker).foregroundColor(theme.textMuted)
     }
 }
 
