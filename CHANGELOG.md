@@ -6,6 +6,8 @@ All notable changes to Margins are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-07-10
+
 ### Added
 - `margins -g` opens in the background without stealing focus — built for
   editor and agent hooks (the README shows a Claude Code auto-open recipe).
@@ -72,7 +74,8 @@ All notable changes to Margins are documented here. The format is based on
   reload, light/dark themes, robust file handling, and a signed + notarized DMG
   plus a Homebrew cask.
 
-[Unreleased]: https://github.com/Chrismacolor/margins/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Chrismacolor/margins/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/Chrismacolor/margins/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/Chrismacolor/margins/compare/v1.0.4...v1.1.0
 [1.0.4]: https://github.com/Chrismacolor/margins/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/Chrismacolor/margins/compare/v1.0.2...v1.0.3
