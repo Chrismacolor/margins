@@ -148,7 +148,13 @@ final class ViewerModel: ObservableObject {
     }
     /// Theme-independent parsed blocks. Colors/fonts are applied later in the
     /// views, so a theme switch never triggers a re-parse.
-    @Published var blocks: [RenderedBlock] = []
+    @Published var blocks: [RenderedBlock] = [] {
+        didSet { parseTick += 1 }
+    }
+    /// Bumped on every `blocks` assignment (sync and async parse paths alike).
+    /// Follow mode keys off this rather than `blocks.count`, which misses the
+    /// "last block grew" case while a stream appends to one paragraph.
+    @Published private(set) var parseTick = 0
     /// Non-blocking banner message (large/truncated file, file removed, etc.).
     @Published var notice: String?
 
@@ -833,6 +839,7 @@ struct ContentView: View {
     @ObservedObject var find: FindModel
     @AppStorage("appTheme") private var appTheme = "system"
     @AppStorage("liveReload") private var liveReload = true
+    @AppStorage("followTail") private var followTail = false
     @Environment(\.colorScheme) private var systemScheme
     @State private var docCopied = false
     @State private var findDebounce: Task<Void, Never>?
@@ -869,7 +876,10 @@ struct ContentView: View {
         .onAppear {
             model.setLiveReload(liveReload)
         }
-        .onChange(of: liveReload) { enabled in model.setLiveReload(enabled) }
+        .onChange(of: liveReload) { enabled in
+            model.setLiveReload(enabled)
+            if !enabled { followTail = false }
+        }
         .onChange(of: find.query) { _ in scheduleRecompute() }
         .onChange(of: model.markdownSource) { _ in scheduleRecompute() }
         .onChange(of: find.isActive) { active in
@@ -950,6 +960,7 @@ struct ContentView: View {
             }
             if model.fileURL != nil {
                 liveToggle
+                followToggle
             }
             themeToggle
         }
@@ -1013,6 +1024,36 @@ struct ContentView: View {
         .accessibilityValue(liveReload ? "On" : "Off")
     }
 
+    // Note: on multi-MB documents a sustained fast writer can postpone visible
+    // updates until it pauses (trailing watcher debounce + parse-generation
+    // drops) — pre-existing reload behavior, not a follow-mode bug.
+    private var followToggle: some View {
+        Button {
+            followTail.toggle()
+            // Following a file that never reloads is useless.
+            if followTail { liveReload = true }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "arrow.down.to.line")
+                Text("Follow")
+            }
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(followTail ? theme.accent : theme.textMuted)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(followTail ? theme.accent.opacity(0.5) : theme.border, lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(followTail ? "Following — scrolls to the end as the file grows; scroll up to stop"
+                         : "Follow off — click to keep the end of a growing file in view")
+        .accessibilityLabel("Follow tail")
+        .accessibilityValue(followTail ? "On" : "Off")
+    }
+
     private var themeToggle: some View {
         Menu {
             Button { appTheme = "system" } label: { Label("System", systemImage: "circle.lefthalf.filled") }
@@ -1059,6 +1100,26 @@ struct ContentView: View {
                 .background(theme.bg)
                 .onChange(of: find.currentIndex) { _ in scrollToCurrentMatch(proxy) }
                 .onChange(of: find.matches) { _ in scrollToCurrentMatch(proxy) }
+                .onChange(of: model.parseTick) { _ in
+                    if followTail { scrollToBottom(proxy) }
+                }
+                .onChange(of: followTail) { on in
+                    if on { scrollToBottom(proxy) }
+                }
+                .onReceive(NotificationCenter.default.publisher(
+                    for: NSScrollView.didLiveScrollNotification)) { note in
+                    // User-initiated scroll away from the bottom detaches follow
+                    // (terminal semantics). The at-bottom gate keeps horizontal
+                    // code-block scrollers — which post the same notification —
+                    // from detaching it, and deliberately ignores which window
+                    // the event came from (settings and model are app-global).
+                    guard followTail,
+                          let scrollView = note.object as? NSScrollView,
+                          let document = scrollView.documentView else { return }
+                    if scrollView.documentVisibleRect.maxY < document.frame.height - 4 {
+                        followTail = false
+                    }
+                }
             }
             .overlay(alignment: .topTrailing) {
                 if find.isActive {
@@ -1072,9 +1133,19 @@ struct ContentView: View {
 
     private func scrollToCurrentMatch(_ proxy: ScrollViewProxy) {
         guard let match = find.current else { return }
+        // Jumping to a match while follow keeps yanking to the bottom would be
+        // a tug-of-war; finding something implies the user wants to stay there.
+        followTail = false
         withAnimation(.easeInOut(duration: 0.2)) {
             proxy.scrollTo(match.blockID, anchor: .center)
         }
+    }
+
+    /// Unanimated on purpose: during streaming this fires on every parse tick,
+    /// and overlapping animated scrolls fight each other.
+    private func scrollToBottom(_ proxy: ScrollViewProxy) {
+        guard let last = model.blocks.last else { return }
+        proxy.scrollTo(last.id, anchor: .bottom)
     }
 
     // Small documents recompute instantly for snappy highlighting; large ones
