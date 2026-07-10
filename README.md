@@ -53,6 +53,7 @@ Pick one of the two options below.
 1. If you don't already have [Homebrew](https://brew.sh), install it first.
 2. Install Margins:
    ```bash
+   brew trust Chrismacolor/tap        # once — Homebrew 6.0.9+ requires trusting third-party taps
    brew install --cask Chrismacolor/tap/margins
    ```
 3. Launch **Margins** from Spotlight or `/Applications`.
