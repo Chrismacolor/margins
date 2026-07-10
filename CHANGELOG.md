@@ -6,6 +6,8 @@ All notable changes to Margins are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-09
+
 ### Added
 - **Follow mode**: a Follow pill in the header keeps the end of the document
   in view as the file grows — made for watching AI tools stream output into a
@@ -60,7 +62,8 @@ All notable changes to Margins are documented here. The format is based on
   reload, light/dark themes, robust file handling, and a signed + notarized DMG
   plus a Homebrew cask.
 
-[Unreleased]: https://github.com/Chrismacolor/margins/compare/v1.0.4...HEAD
+[Unreleased]: https://github.com/Chrismacolor/margins/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Chrismacolor/margins/compare/v1.0.4...v1.1.0
 [1.0.4]: https://github.com/Chrismacolor/margins/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/Chrismacolor/margins/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/Chrismacolor/margins/compare/v1.0.1...v1.0.2
