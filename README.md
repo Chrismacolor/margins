@@ -86,7 +86,8 @@ Open a file any of these ways:
 1. In Margins, click **Open** in the toolbar and choose a file.
 2. In Finder, right-click a `.md` file → **Open With → Margins**.
 3. Drag a `.md` file onto the Margins window.
-4. From the terminal: `margins notes.md` (or pipe into it — see
+4. From the terminal: `margins notes.md`, or `margins .` for the newest
+   Markdown file under the current directory (or pipe into it — see
    [AI workflows](#ai-workflows)).
 
 Supported extensions: `.md`, `.markdown`, `.mdown`.
@@ -112,6 +113,9 @@ claude -p "Summarize this repo" > notes.md &
 margins notes.md
 ```
 
+Not sure what it wrote? `margins .` opens the most recently modified Markdown
+file under the current directory.
+
 **Pipe straight in.** Anything that prints Markdown can stream into a Margins
 window — output renders live as the pipe fills:
 
@@ -123,6 +127,24 @@ This pairs nicely with on-device generators like Apple's
 [`fm` CLI / Foundation Models SDK](https://github.com/apple/python-apple-fm-sdk):
 stream a local model's output into a rendered, readable page instead of a
 scrolling terminal.
+
+**Auto-open from Claude Code.** With this hook in `~/.claude/settings.json`,
+every Markdown file the agent writes appears in Margins automatically —
+`margins -g` opens in the background, so your terminal keeps focus:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": "Write|Edit",
+      "hooks": [{
+        "type": "command",
+        "command": "jq -r '.tool_input.file_path // empty' | { read -r f; case \"$f\" in *.md|*.markdown|*.mdown) margins -g \"$f\";; esac; }"
+      }]
+    }]
+  }
+}
+```
 
 ## Build from source
 

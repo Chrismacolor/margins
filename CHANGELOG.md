@@ -6,6 +6,16 @@ All notable changes to Margins are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- `margins -g` opens in the background without stealing focus — built for
+  editor and agent hooks (the README shows a Claude Code auto-open recipe).
+- `margins <dir>` (so `margins .` works) opens the newest Markdown file under
+  a directory, skipping hidden folders and `node_modules`.
+
+### Internal
+- The CLI shim now has tests: `scripts/test_cli.sh` exercises it in a dry-run
+  mode (`MARGINS_DRY_RUN=1`) and runs as part of `scripts/test.sh`.
+
 ## [1.1.0] - 2026-07-09
 
 ### Added
