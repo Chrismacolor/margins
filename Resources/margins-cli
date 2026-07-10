@@ -7,19 +7,28 @@
 # installed bundle — the bundle is code-signed and any change breaks the seal.
 #
 #   margins <file.md> ...     open Markdown file(s) in Margins
+#   margins <dir> | margins . open the newest Markdown file under a directory
 #   some-cmd | margins [-]    render piped Markdown, streaming as it arrives
+#   margins -g ...            open in the background (no focus steal)
 #   margins --help|--version
+#
+# MARGINS_DRY_RUN=1 prints what would be opened instead of opening (tests).
 
 set -eu
 
 BUNDLE_ID="com.disanto.margins"
+OPEN_FLAGS=""
 
 usage() {
   cat <<'EOF'
 usage: margins <file.md> ...     open Markdown file(s) in Margins
+       margins <dir>             open the newest Markdown file under <dir>
+                                 (so `margins .` shows what an agent just wrote)
        some-cmd | margins [-]    render piped Markdown (streams live as the
                                  pipe fills; turn on the Follow pill to keep
                                  the newest output in view)
+       margins -g ...            background open — render without stealing
+                                 focus (for hooks and scripts)
        margins --help            show this help
        margins --version         print the app version
 
@@ -39,15 +48,32 @@ version() {
 }
 
 # Bundle id first (works even if the app was renamed); `-a` fallback covers
-# dev builds that LaunchServices hasn't registered yet.
+# dev builds that LaunchServices hasn't registered yet. $OPEN_FLAGS is
+# intentionally unquoted: it is either empty or a flag list for open(1).
 open_app() {
-  open -b "$BUNDLE_ID" "$@" 2>/dev/null || open -a "Margins" "$@"
+  if [ "${MARGINS_DRY_RUN:-0}" = "1" ]; then
+    for f in "$@"; do printf 'DRY%s %s\n' "${OPEN_FLAGS:+ $OPEN_FLAGS}" "$f"; done
+    return 0
+  fi
+  open $OPEN_FLAGS -b "$BUNDLE_ID" "$@" 2>/dev/null || open $OPEN_FLAGS -a "Margins" "$@"
 }
 
-case "${1:-}" in
-  -h|--help) usage; exit 0 ;;
-  --version) version; exit 0 ;;
-esac
+# Newest Markdown file under a directory, skipping hidden dirs and
+# node_modules. stat/sort/cut tolerates spaces in paths (not newlines).
+newest_md() {
+  find "$1" -type f \( -name '*.md' -o -name '*.markdown' -o -name '*.mdown' \) \
+    -not -path '*/.*' -not -path '*/node_modules/*' \
+    -exec stat -f '%m %N' {} + 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -g|--background) OPEN_FLAGS="-g"; shift ;;
+    -h|--help) usage; exit 0 ;;
+    --version) version; exit 0 ;;
+    *) break ;;
+  esac
+done
 
 if [ "${1:-}" = "-" ] || { [ $# -eq 0 ] && [ ! -t 0 ]; }; then
   # Spool stdin into a watched temp file. Open it first (empty), then append:
@@ -67,5 +93,19 @@ if [ $# -eq 0 ]; then
   usage >&2
   exit 64
 fi
+
+# Resolve directory arguments to the newest Markdown file beneath them.
+for a in "$@"; do
+  shift
+  if [ -d "$a" ]; then
+    m="$(newest_md "$a")"
+    if [ -z "$m" ]; then
+      printf 'margins: no Markdown files under %s\n' "$a" >&2
+      exit 66
+    fi
+    a="$m"
+  fi
+  set -- "$@" "$a"
+done
 
 open_app "$@"
