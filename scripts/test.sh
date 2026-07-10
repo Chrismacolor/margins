@@ -23,3 +23,5 @@ xcrun swiftc \
   -o "$TMP_DIR/testrunner"
 
 "$TMP_DIR/testrunner"
+
+"$SCRIPT_DIR/test_cli.sh"
