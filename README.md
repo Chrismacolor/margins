@@ -105,6 +105,10 @@ Supported extensions: `.md`, `.markdown`, `.mdown`.
 AI tools produce a lot of Markdown; Margins is built to be the fast, native
 window you read it in.
 
+<p align="center">
+  <img src="docs/follow-demo.gif" alt="Margins following a Markdown file as an agent writes it" width="720">
+</p>
+
 **Watch an agent write.** Point Margins at the file your tool is writing and
 turn on the **Follow** pill — the view sticks to the end as new content lands
 (scroll up to detach, click the pill to re-attach; Follow turns Live reload on
