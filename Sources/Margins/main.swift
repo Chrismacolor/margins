@@ -104,11 +104,11 @@ final class FileWatcher {
             self.scheduleNotify()
         }
 
-        source.setCancelHandler { [weak self] in
-            guard let self, self.fileDescriptor >= 0 else { return }
-            close(self.fileDescriptor)
-            self.fileDescriptor = -1
-        }
+        // Capture the descriptor by value: the handler runs asynchronously
+        // after cancel(), by which point a deinit-triggered cancel has already
+        // deallocated self — a weak capture would silently leak the fd.
+        let fd = fileDescriptor
+        source.setCancelHandler { close(fd) }
 
         self.source = source
         source.resume()
@@ -1350,6 +1350,13 @@ struct MarginsApp: App {
                 .onOpenURL { url in
                     model.openFile(url)
                 }
+                // Every window shares the one ViewerModel, so a second window
+                // is only ever a clone of the first. Declaring that an open
+                // window prefers to handle external events (file opens, URLs)
+                // makes macOS reuse it instead of spawning a new scene per
+                // event — e.g. an editor hook re-opening the file on every
+                // save would otherwise stack up duplicate windows.
+                .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
         }
         .commands {
             CommandGroup(after: .pasteboard) {

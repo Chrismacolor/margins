@@ -6,6 +6,15 @@ All notable changes to Margins are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- Opening a file that's already showing (e.g. an agent hook firing
+  `margins -g` on every save) reuses the existing window instead of stacking
+  up duplicate windows — one per open event.
+- The file watcher no longer leaks a file descriptor each time the watched
+  file changes identity (new file opened, or an atomic save replacing it).
+  Under a rapid save loop the leak could eventually exhaust descriptors and
+  silently stop live reload.
+
 ## [1.1.1] - 2026-07-10
 
 ### Added
