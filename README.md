@@ -19,7 +19,8 @@ JavaScript, no plugins, no setup.
 More and more of the Markdown on a Mac isn't written by people — agents, chat
 CLIs, and on-device models produce it constantly. Margins is the quick,
 no-frills window to read it in: point it at a file and watch it render live
-while the model writes, or pipe output straight into a window
+while the model writes, pipe output straight into a window, or hook it into
+your agent so everything it writes simply appears, already rendered
 (see [AI workflows](#ai-workflows)).
 
 <p align="center">
@@ -33,7 +34,8 @@ while the model writes, or pipe output straight into a window
 - **Dark / light** — follows the macOS appearance, with a manual override.
 - **Live reload** — edits on disk update the view instantly (toggle in the header).
 - **Follow** — auto-scrolls as a file grows, so you can watch an AI tool write.
-- **Terminal-friendly** — a `margins` command opens files or renders piped output.
+- **Terminal-friendly** — a `margins` command opens files, piped output, or the
+  newest Markdown in a directory (`margins .`).
 - **Find** — `⌘F` searches the document with match highlighting and quick navigation.
 - **Frontmatter** — YAML metadata (`---` blocks) renders as a tidy properties panel.
 - **Task lists** — `- [ ]` / `- [x]` items render with checkboxes (read-only).
