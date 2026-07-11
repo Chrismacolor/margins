@@ -377,17 +377,43 @@ struct MarkdownRenderer {
 
         while index < lines.count {
             guard let item = parseListItem(lines[index]) else { break }
+            index += 1
+
+            // Fold hard-wrapped continuation lines into the current item (same
+            // single-space join as parseParagraph), so a bullet split across
+            // source lines stays one item. A blank line, a new item, or any
+            // other block start ends it.
+            var continuation = ""
+            while index < lines.count {
+                let line = lines[index]
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if
+                    trimmed.isEmpty ||
+                    trimmed.hasPrefix("```") ||
+                    trimmed.hasPrefix(">") ||
+                    parseHeader(trimmed) != nil ||
+                    isHorizontalRule(trimmed) ||
+                    parseListItem(line) != nil ||
+                    looksLikeTableStart(lines, index)
+                {
+                    break
+                }
+                continuation += " " + trimmed
+                index += 1
+            }
+
             switch item {
             case let .unordered(indent, text):
-                if let task = taskCheckbox(text) {
+                let full = text + continuation
+                if let task = taskCheckbox(full) {
                     rows.append(ListItem(indent: indent, marker: "•", inline: parseInline(task.remainder), checkbox: task.checked))
                 } else {
-                    rows.append(ListItem(indent: indent, marker: "•", inline: parseInline(text), checkbox: nil))
+                    rows.append(ListItem(indent: indent, marker: "•", inline: parseInline(full), checkbox: nil))
                 }
             case let .ordered(indent, number, text):
-                rows.append(ListItem(indent: indent, marker: "\(number).", inline: parseInline(text), checkbox: nil))
+                let full = text + continuation
+                rows.append(ListItem(indent: indent, marker: "\(number).", inline: parseInline(full), checkbox: nil))
             }
-            index += 1
         }
 
         return (.list(rows), index)

@@ -40,6 +40,7 @@ struct TestRunner {
         testCallout()
         testLists()
         testTaskLists()
+        testListContinuation()
         testHorizontalRule()
         testParagraphTableBoundary()
         testEmpty()
@@ -146,6 +147,45 @@ struct TestRunner {
             check(plain(items[1].inline) == "[ ]tight", "missing space kept literal")
             check(plain(items[2].inline) == "[ ] ordered", "ordered item keeps brackets")
         } else { check(false, "near-miss list block") }
+    }
+
+    static func testListContinuation() {
+        print("List continuation (hard-wrapped items)")
+
+        // (a) A hard-wrapped unordered item folds into one item, single-spaced.
+        let unordered = MarkdownRenderer.parse("- first line\n  second line\n- next item")
+        check(unordered.count == 1 && blockKind(unordered[0].block) == "list", "no stray paragraph after the list")
+        if case let .list(items) = unordered[0].block {
+            check(items.count == 2, "two items despite the wrap")
+            check(plain(items[0].inline) == "first line second line", "wrapped lines join with a space")
+            check(plain(items[1].inline) == "next item", "sibling item intact")
+        } else { check(false, "wrapped unordered list block") }
+
+        // (b) A hard-wrapped ordered item folds too, markers preserved.
+        let ordered = MarkdownRenderer.parse("1. do a thing\n   across lines\n2. and another")
+        if case let .list(items) = ordered[0].block {
+            check(items.count == 2, "two ordered items")
+            check(plain(items[0].inline) == "do a thing across lines", "wrapped ordered item joins")
+            check(items.map(\.marker) == ["1.", "2."], "ordered markers preserved")
+        } else { check(false, "wrapped ordered list block") }
+
+        // (c) A wrapped task item keeps its checkbox state.
+        let task = MarkdownRenderer.parse("- [x] finish the thing\n  even after wrapping")
+        if case let .list(items) = task[0].block {
+            check(items.count == 1, "one task item")
+            check(items[0].checkbox == true, "checkbox state survives continuation")
+            check(plain(items[0].inline) == "finish the thing even after wrapping", "task text joins with continuation")
+        } else { check(false, "wrapped task list block") }
+
+        // (d) A blank line ends the list; the following paragraph stays separate.
+        let blank = MarkdownRenderer.parse("- item\n\nA following paragraph.")
+        check(blank.map { blockKind($0.block) } == ["list", "paragraph"],
+              "blank line after an item ends the list")
+
+        // (e) A header right after an item is not swallowed as a continuation.
+        let header = MarkdownRenderer.parse("- item\n# Heading")
+        check(header.map { blockKind($0.block) } == ["list", "heading"],
+              "header right after an item is not swallowed")
     }
 
     static func testHorizontalRule() {

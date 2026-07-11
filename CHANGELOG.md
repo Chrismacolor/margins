@@ -7,6 +7,11 @@ All notable changes to Margins are documented here. The format is based on
 ## [Unreleased]
 
 ### Fixed
+- Hard-wrapped list items (a bullet continued on indented lines) render as a
+  single item again instead of a one-line bullet followed by a stray
+  full-width paragraph. Ordered and task-list items included.
+- Inline code spans get a little horizontal padding, so the card background
+  no longer sits flush against the first and last glyph.
 - Opening a file that's already showing (e.g. an agent hook firing
   `margins -g` on every save) reuses the existing window instead of stacking
   up duplicate windows — one per open event.

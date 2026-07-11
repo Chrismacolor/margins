@@ -407,7 +407,7 @@ private struct FrontmatterView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(theme.textMuted)
                         .frame(width: 92, alignment: .leading)
-                    Text(withFindHighlights(styledValue(field.value), segmentID: "\(blockID)#F\(index)", find: find))
+                    Text(preparedForDisplay(styledValue(field.value), segmentID: "\(blockID)#F\(index)", find: find))
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -441,7 +441,7 @@ private struct HeadingView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(withFindHighlights(styled, segmentID: segmentID, find: find))
+            Text(preparedForDisplay(styled, segmentID: segmentID, find: find))
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
@@ -484,7 +484,7 @@ private struct ListView: View {
                     markerView(for: row)
                         .font(.system(size: FontSize.body))
                         .frame(minWidth: 14, alignment: .trailing)
-                    Text(withFindHighlights(
+                    Text(preparedForDisplay(
                         styledInline(row.inline, size: FontSize.body, baseColor: theme.text, theme: theme),
                         segmentID: "\(blockID)#L\(index)", find: find))
                         .lineSpacing(readingLineSpacing(for: FontSize.body))
@@ -525,7 +525,7 @@ private struct CalloutView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(kind.color(theme))
                 }
-                Text(withFindHighlights(
+                Text(preparedForDisplay(
                     styledInline(inline, size: FontSize.body, baseColor: theme.text, theme: theme),
                     segmentID: segmentID, find: find))
                     .lineSpacing(readingLineSpacing(for: FontSize.body))
@@ -591,7 +591,7 @@ private struct MarkdownTableView: View {
         let styled = isHeader
             ? styledInline(raw, size: FontSize.tableHeader, weight: .semibold, baseColor: theme.textMuted, theme: theme)
             : styledInline(raw, size: FontSize.tableCell, baseColor: theme.text, theme: theme)
-        return Text(withFindHighlights(styled, segmentID: segmentID, find: find))
+        return Text(preparedForDisplay(styled, segmentID: segmentID, find: find))
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: alignment(for: column))
             .padding(.horizontal, 12)
@@ -633,7 +633,7 @@ private struct CodeBlockView: View {
                     .foregroundStyle(theme.textMuted)
             }
             ScrollView(.horizontal, showsIndicators: false) {
-                Text(withFindHighlights(display, segmentID: segmentID, find: find))
+                Text(preparedForDisplay(display, segmentID: segmentID, find: find))
                     .lineSpacing(readingLineSpacing(for: FontSize.codeBlock))
                     .textSelection(.enabled)
                     .padding(.trailing, 8)
@@ -802,32 +802,68 @@ final class FindModel: ObservableObject {
     }
 }
 
-/// Paint match backgrounds onto an already-styled string. The current match is
-/// drawn solid with inverted text; the rest get a translucent amber wash.
-private func withFindHighlights(
+/// Final display-preparation for a leaf `Text`: paints search-match backgrounds
+/// (the current match solid with inverted text, the rest a translucent amber
+/// wash) and then pads inline-code spans. Called just before every leaf Text.
+private func preparedForDisplay(
     _ styled: AttributedString,
     segmentID: String,
     find: FindHighlight
 ) -> AttributedString {
-    guard !find.query.isEmpty else { return styled }
-    let plain = String(styled.characters)
-    guard !plain.isEmpty else { return styled }
-
     var result = styled
-    var searchRange = plain.startIndex..<plain.endIndex
-    while let r = plain.range(of: find.query, options: .caseInsensitive, range: searchRange) {
-        let startOff = plain.distance(from: plain.startIndex, to: r.lowerBound)
-        let length = plain.distance(from: r.lowerBound, to: r.upperBound)
-        let lo = result.index(result.startIndex, offsetByCharacters: startOff)
-        let hi = result.index(lo, offsetByCharacters: length)
-        let isCurrent = segmentID == find.currentSegmentID && startOff == find.currentStart
-        if isCurrent {
-            result[lo..<hi].backgroundColor = find.theme.amber
-            result[lo..<hi].foregroundColor = find.theme.bg
-        } else {
-            result[lo..<hi].backgroundColor = find.theme.amber.opacity(0.32)
+    if !find.query.isEmpty {
+        let plain = String(styled.characters)
+        var searchRange = plain.startIndex..<plain.endIndex
+        while let r = plain.range(of: find.query, options: .caseInsensitive, range: searchRange) {
+            let startOff = plain.distance(from: plain.startIndex, to: r.lowerBound)
+            let length = plain.distance(from: r.lowerBound, to: r.upperBound)
+            let lo = result.index(result.startIndex, offsetByCharacters: startOff)
+            let hi = result.index(lo, offsetByCharacters: length)
+            let isCurrent = segmentID == find.currentSegmentID && startOff == find.currentStart
+            if isCurrent {
+                result[lo..<hi].backgroundColor = find.theme.amber
+                result[lo..<hi].foregroundColor = find.theme.bg
+            } else {
+                result[lo..<hi].backgroundColor = find.theme.amber.opacity(0.32)
+            }
+            searchRange = r.upperBound..<plain.endIndex
         }
-        searchRange = r.upperBound..<plain.endIndex
+    }
+    return paddedInlineCode(result, theme: find.theme)
+}
+
+/// Pads each inline-code span with a narrow no-break space on both sides, styled
+/// with the code background + monospaced font so the card visually extends past
+/// the glyphs (SwiftUI `Text` can't pad a run directly). Runs last, after find
+/// highlights, so match offsets stay in sync with the unpadded parse text. Fenced
+/// code blocks carry no `.code` intent, so this leaves them untouched.
+private func paddedInlineCode(_ styled: AttributedString, theme: Theme) -> AttributedString {
+    // Coalesce adjacent `.code` runs into character-offset spans: a find
+    // highlight inside a code span splits it into several runs that all keep the
+    // `.code` intent, and we must pad only the merged span's edges, not mid-span.
+    var spans: [(lower: Int, upper: Int)] = []
+    var current: (lower: Int, upper: Int)?
+    for run in styled.runs {
+        let lo = styled.characters.distance(from: styled.startIndex, to: run.range.lowerBound)
+        let hi = styled.characters.distance(from: styled.startIndex, to: run.range.upperBound)
+        if run.inlinePresentationIntent?.contains(.code) ?? false {
+            current = (current?.lower ?? lo, hi)
+        } else if let c = current {
+            spans.append(c); current = nil
+        }
+    }
+    if let c = current { spans.append(c) }
+    guard !spans.isEmpty else { return styled }
+
+    var pad = AttributedString("\u{202F}")  // U+202F narrow no-break space
+    pad.font = .system(size: FontSize.inlineCode, weight: .regular, design: .monospaced)
+    pad.backgroundColor = theme.card
+
+    // Insert back-to-front so the lower spans' offsets stay valid as we go.
+    var result = styled
+    for span in spans.reversed() {
+        result.insert(pad, at: result.index(result.startIndex, offsetByCharacters: span.upper))
+        result.insert(pad, at: result.index(result.startIndex, offsetByCharacters: span.lower))
     }
     return result
 }
@@ -1290,7 +1326,7 @@ struct ContentView: View {
             HeadingView(level: level, inline: inline, theme: theme, segmentID: "\(id)", find: hl)
                 .copyableOnHover(plainText(of: block), theme: theme)
         case let .paragraph(inline):
-            Text(withFindHighlights(
+            Text(preparedForDisplay(
                 styledInline(inline, size: FontSize.body, baseColor: theme.text, theme: theme),
                 segmentID: "\(id)", find: hl))
                 .lineSpacing(readingLineSpacing(for: FontSize.body))
