@@ -6,6 +6,8 @@ All notable changes to Margins are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-07-11
+
 ### Fixed
 - Hard-wrapped list items (a bullet continued on indented lines) render as a
   single item again instead of a one-line bullet followed by a stray
