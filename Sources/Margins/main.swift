@@ -443,6 +443,35 @@ final class ViewerModel: ObservableObject {
         }
     }
 
+    /// Registers this app as the system-default opener for Markdown files —
+    /// the in-app replacement for Finder's Get Info → Change All ritual.
+    /// The three extensions usually collapse to one UTType
+    /// (net.daringfireball.markdown), so the Set keeps it to a single
+    /// LaunchServices call; macOS may show its own confirmation dialog.
+    func makeDefaultMarkdownApp() {
+        let types = Set(["md", "markdown", "mdown"].compactMap { UTType(filenameExtension: $0) })
+        guard !types.isEmpty else { return }
+
+        let group = DispatchGroup()
+        var failure: Error?
+        for type in types {
+            group.enter()
+            NSWorkspace.shared.setDefaultApplication(at: Bundle.main.bundleURL, toOpen: type) { error in
+                // Completions arrive on an arbitrary queue; funnel through
+                // main so the error write and the notify below are ordered.
+                DispatchQueue.main.async {
+                    if let error { failure = error }
+                    group.leave()
+                }
+            }
+        }
+        group.notify(queue: .main) { [weak self] in
+            self?.notice = failure == nil
+                ? "Margins is now the default app for Markdown files."
+                : "Margins wasn’t made the default — the change may have been declined."
+        }
+    }
+
     func pickFolderToWatch() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -1620,6 +1649,9 @@ struct MarginsApp: App {
                 .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
         }
         .commands {
+            CommandGroup(after: .appSettings) {
+                Button("Make Default for Markdown") { model.makeDefaultMarkdownApp() }
+            }
             CommandGroup(after: .newItem) {
                 Button("Watch Folder…") { model.pickFolderToWatch() }
                     .keyboardShortcut("o", modifiers: [.command, .shift])

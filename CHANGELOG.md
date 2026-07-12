@@ -15,6 +15,9 @@ All notable changes to Margins are documented here. The format is based on
   files are written in alternation), and watching an empty folder waits for
   the first Markdown file to appear. Watching turns Live and Follow on;
   opening a file explicitly (or turning Live off) stops the watch.
+- **Margins → Make Default for Markdown**: one menu click registers Margins
+  as the system-wide opener for `.md`/`.markdown`/`.mdown`, replacing the
+  Finder Get Info → Change All ritual. A banner confirms whether it took.
 
 ### Fixed
 - Switching to a much shorter document (watch mode auto-switch, or a hook

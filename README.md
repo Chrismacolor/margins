@@ -96,9 +96,11 @@ Supported extensions: `.md`, `.markdown`, `.mdown`.
 
 ### Make Margins the default for Markdown
 
-1. In Finder, right-click any `.md` file → **Get Info**.
-2. Under **Open with**, choose **Margins**.
-3. Click **Change All…** to apply it to every `.md` file.
+Choose **Margins → Make Default for Markdown** from the menu bar — from then
+on, double-clicking any `.md` file opens Margins.
+
+Or do it the long way in Finder: right-click any `.md` file → **Get Info** →
+**Open with** → choose **Margins** → **Change All…**.
 
 ## AI workflows
 
