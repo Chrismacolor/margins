@@ -122,6 +122,21 @@ margins notes.md
 Not sure what it wrote? `margins .` opens the most recently modified Markdown
 file under the current directory.
 
+**Watch a folder, not a file.** When you don't know which file your agent
+will write next, watch the folder — Margins always shows the most recently
+written Markdown file under it and switches automatically as the agent moves
+between files (Live and Follow turn on for you; click the **Watching** pill
+to stop):
+
+```bash
+margins -w .          # or: margins --watch path/to/project
+```
+
+Hidden folders and `node_modules` are skipped, and an empty folder simply
+waits for the first Markdown file to appear. Also available in-app via
+**File → Watch Folder…** (⇧⌘O), or by opening a folder any way you'd open a
+file.
+
 **Pipe straight in.** Anything that prints Markdown can stream into a Margins
 window — output renders live as the pipe fills:
 
@@ -190,11 +205,14 @@ bounded. Parser benchmark (`scripts/test.sh`, Apple Silicon, release build):
 
 ## Architecture
 
-Two Swift files compiled into one binary:
+Four Swift files compiled into one binary:
 
 - `Sources/Margins/MarkdownRenderer.swift` — a SwiftUI-free Markdown parser that
   produces theme-independent blocks (unit-testable standalone, and a theme switch
   never re-parses).
+- `Sources/Margins/MarkdownSearch.swift` — the SwiftUI-free Find core.
+- `Sources/Margins/FolderScan.swift` — the SwiftUI-free watch-mode policy
+  (newest-Markdown scan and switch rules).
 - `Sources/Margins/main.swift` — the SwiftUI app, theme, and views that apply
   colors/fonts at render time.
 

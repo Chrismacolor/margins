@@ -6,6 +6,21 @@ All notable changes to Margins are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Watch mode**: point Margins at a folder — `margins -w .`, **File → Watch
+  Folder…** (⇧⌘O), or drop/open a folder — and it keeps showing the most
+  recently written Markdown file under it, switching automatically as your
+  agent moves between files. Hidden folders and `node_modules` are ignored,
+  a file must be meaningfully newer to steal the view (no flapping when two
+  files are written in alternation), and watching an empty folder waits for
+  the first Markdown file to appear. Watching turns Live and Follow on;
+  opening a file explicitly (or turning Live off) stops the watch.
+
+### Fixed
+- Switching to a much shorter document (watch mode auto-switch, or a hook
+  opening a different file) no longer shows a blank window when the previous
+  document had been scrolled or followed past the shorter one's end.
+
 ## [1.1.2] - 2026-07-11
 
 ### Fixed

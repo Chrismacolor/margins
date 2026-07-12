@@ -10,7 +10,9 @@ ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
 RENDERER="$ROOT_DIR/Sources/Margins/MarkdownRenderer.swift"
 SEARCH="$ROOT_DIR/Sources/Margins/MarkdownSearch.swift"
+FOLDERSCAN="$ROOT_DIR/Sources/Margins/FolderScan.swift"
 TESTS="$ROOT_DIR/Tests/MarkdownRendererTests.swift"
+FOLDERSCAN_TESTS="$ROOT_DIR/Tests/FolderScanTests.swift"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -19,7 +21,7 @@ xcrun swiftc \
   -O \
   -parse-as-library \
   -target arm64-apple-macos13.0 \
-  "$RENDERER" "$SEARCH" "$TESTS" \
+  "$RENDERER" "$SEARCH" "$FOLDERSCAN" "$TESTS" "$FOLDERSCAN_TESTS" \
   -o "$TMP_DIR/testrunner"
 
 "$TMP_DIR/testrunner"

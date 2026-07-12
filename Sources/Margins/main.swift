@@ -1,4 +1,5 @@
 import AppKit
+import CoreServices
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -140,6 +141,81 @@ final class FileWatcher {
     }
 }
 
+/// Watches a directory tree recursively via FSEvents and reports each
+/// coalesced batch of changed paths. It only observes — deciding *which*
+/// Markdown file to show stays with ViewerModel + FolderScan, and reloading
+/// the shown file's content stays with FileWatcher.
+///
+/// FSEvents rather than a DispatchSource because a dispatch source on a
+/// directory descriptor only reports direct children, and agents write into
+/// subdirectories. The stream's latency doubles as the change debounce.
+final class DirectoryWatcher {
+    /// The stream context points at this box, retained by the stream itself,
+    /// instead of at the watcher. A callback racing deinit then reads a zeroed
+    /// weak reference rather than a dangling pointer.
+    private final class Box {
+        weak var owner: DirectoryWatcher?
+    }
+
+    private let onEvents: ([String]) -> Void
+    private let queue = DispatchQueue(label: "com.disanto.margins.dirwatcher")
+    private var stream: FSEventStreamRef?
+
+    init?(directory: URL, onEvents: @escaping ([String]) -> Void) {
+        self.onEvents = onEvents
+
+        let box = Box()
+        var context = FSEventStreamContext(
+            version: 0,
+            info: Unmanaged.passRetained(box).toOpaque(),
+            retain: nil,
+            release: { info in
+                guard let info else { return }
+                Unmanaged<Box>.fromOpaque(info).release()
+            },
+            copyDescription: nil
+        )
+
+        let callback: FSEventStreamCallback = { _, info, _, eventPaths, _, _ in
+            guard let info else { return }
+            let box = Unmanaged<Box>.fromOpaque(info).takeUnretainedValue()
+            guard let owner = box.owner,
+                  let paths = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue() as? [String]
+            else { return }
+            owner.onEvents(paths)
+        }
+
+        guard let stream = FSEventStreamCreate(
+            kCFAllocatorDefault,
+            callback,
+            &context,
+            [directory.path] as CFArray,
+            FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+            0.5, // seconds FSEvents coalesces before calling back
+            FSEventStreamCreateFlags(kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents)
+        ) else {
+            // Creation failed, so the stream will never run the release
+            // callback; balance the passRetained ourselves.
+            Unmanaged.passUnretained(box).release()
+            return nil
+        }
+        box.owner = self
+        self.stream = stream
+        FSEventStreamSetDispatchQueue(stream, queue)
+        FSEventStreamStart(stream)
+    }
+
+    deinit { stop() }
+
+    func stop() {
+        guard let stream else { return }
+        FSEventStreamStop(stream)
+        FSEventStreamInvalidate(stream) // releases the context's Box
+        FSEventStreamRelease(stream)
+        self.stream = nil
+    }
+}
+
 @MainActor
 final class ViewerModel: ObservableObject {
     @Published var fileURL: URL?
@@ -157,8 +233,12 @@ final class ViewerModel: ObservableObject {
     @Published private(set) var parseTick = 0
     /// Non-blocking banner message (large/truncated file, file removed, etc.).
     @Published var notice: String?
+    /// Non-nil while watch mode is active: the folder whose newest Markdown
+    /// file the viewer keeps showing.
+    @Published private(set) var watchedFolder: URL?
 
     private var watcher: FileWatcher?
+    private var folderWatcher: DirectoryWatcher?
     private var liveReloadEnabled = true
     private var parseGeneration = 0
 
@@ -187,7 +267,25 @@ final class ViewerModel: ObservableObject {
         }
     }
 
+    /// Routes any incoming URL (Finder, CLI, drop, URL scheme): a directory
+    /// enters watch mode, a file opens directly.
+    func open(_ url: URL) {
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+           isDirectory.boolValue {
+            watchFolder(url)
+        } else {
+            openFile(url)
+        }
+    }
+
+    /// Opening a specific file is an explicit choice to leave watch mode.
     func openFile(_ url: URL) {
+        stopWatchingFolder()
+        display(url)
+    }
+
+    private func display(_ url: URL) {
         do {
             let (text, banner) = try loadContents(of: url)
             notice = banner
@@ -240,7 +338,71 @@ final class ViewerModel: ObservableObject {
             reloadFromDisk()
         } else {
             watcher = nil
+            // Watch mode without live reload would silently show stale
+            // content while claiming to track the folder.
+            stopWatchingFolder()
         }
+    }
+
+    /// Enters watch mode: shows the newest Markdown file under `folder` and
+    /// keeps switching to whichever eligible file was written most recently.
+    func watchFolder(_ folder: URL) {
+        stopWatchingFolder()
+        folderWatcher = DirectoryWatcher(directory: folder) { [weak self] paths in
+            Task { @MainActor in self?.watchedFolderDidChange(paths) }
+        }
+        guard folderWatcher != nil else {
+            notice = "Can’t watch \(folder.lastPathComponent) — the folder may not be accessible."
+            return
+        }
+        watchedFolder = folder
+        if let newest = FolderScan.newestMarkdown(under: folder) {
+            display(newest.url)
+        } else {
+            // Nothing to show yet — stay in watch mode; the first Markdown
+            // file written under the folder will appear on its own.
+            fileURL = nil
+            markdownSource = ""
+            watcher = nil
+            notice = "Watching \(folder.lastPathComponent) — no Markdown files yet."
+        }
+    }
+
+    func stopWatchingFolder() {
+        folderWatcher = nil
+        watchedFolder = nil
+    }
+
+    /// A coalesced FSEvents batch arrived for the watched folder. Ignore it
+    /// unless it plausibly changes which file is newest, then rescan and apply
+    /// the switch policy.
+    private func watchedFolderDidChange(_ paths: [String]) {
+        guard let root = watchedFolder else { return }
+        guard FileManager.default.fileExists(atPath: root.path) else {
+            stopWatchingFolder()
+            notice = "\(root.lastPathComponent) is no longer available — stopped watching."
+            return
+        }
+        // A directory rename/removal reports the directory's path, not each
+        // file inside it, so "current file vanished" is its own trigger.
+        let currentGone = fileURL.map { !FileManager.default.fileExists(atPath: $0.path) } ?? false
+        guard currentGone || paths.contains(where: { FolderScan.isEligibleEventPath($0, root: root.path) })
+        else { return }
+
+        guard let newest = FolderScan.newestMarkdown(under: root) else {
+            // No Markdown left; reloadFromDisk's banner already covers a
+            // deleted current file. Keep watching for the next one.
+            return
+        }
+        if newest.url == fileURL { return } // content reloads are FileWatcher's job
+        let current = fileURL.flatMap(modificationDate(of:))
+        if FolderScan.shouldSwitch(currentModified: current, candidateModified: newest.modified) {
+            display(newest.url)
+        }
+    }
+
+    private func modificationDate(of url: URL) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
     }
 
     private func startWatching(_ url: URL) {
@@ -278,6 +440,19 @@ final class ViewerModel: ObservableObject {
 
         if panel.runModal() == .OK, let url = panel.url {
             openFile(url)
+        }
+    }
+
+    func pickFolderToWatch() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Watch"
+        panel.message = "Margins will keep showing the newest Markdown file under the chosen folder."
+
+        if panel.runModal() == .OK, let url = panel.url {
+            watchFolder(url)
         }
     }
 }
@@ -916,6 +1091,14 @@ struct ContentView: View {
             model.setLiveReload(enabled)
             if !enabled { followTail = false }
         }
+        .onChange(of: model.watchedFolder) { folder in
+            // Watch mode exists to see an agent write: reload live and keep
+            // the tail in view without requiring two more clicks.
+            if folder != nil {
+                liveReload = true
+                followTail = true
+            }
+        }
         .onChange(of: find.query) { _ in scheduleRecompute() }
         .onChange(of: model.markdownSource) { _ in scheduleRecompute() }
         .onChange(of: find.isActive) { active in
@@ -933,7 +1116,7 @@ struct ContentView: View {
                     let data = data as? Data,
                     let url = URL(dataRepresentation: data, relativeTo: nil)
                 else { return }
-                Task { @MainActor in model.openFile(url) }
+                Task { @MainActor in model.open(url) }
             }
             return true
         }
@@ -993,6 +1176,9 @@ struct ContentView: View {
 
             if !model.markdownSource.isEmpty {
                 copyDocButton
+            }
+            if model.watchedFolder != nil {
+                watchToggle
             }
             if model.fileURL != nil {
                 liveToggle
@@ -1090,6 +1276,34 @@ struct ContentView: View {
         .accessibilityValue(followTail ? "On" : "Off")
     }
 
+    // Watch mode has no "off but visible" state like Live/Follow: the pill
+    // only exists while watching, and clicking it stops the watch.
+    private var watchToggle: some View {
+        Button {
+            model.stopWatchingFolder()
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "eye")
+                Text("Watching \(model.watchedFolder?.lastPathComponent ?? "")")
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(theme.accent)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(theme.accent.opacity(0.5), lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: 220)
+        .help("Watching \(model.watchedFolder?.path ?? "") — shows its newest Markdown file as it's written; click to stop")
+        .accessibilityLabel("Stop watching folder")
+    }
+
     private var themeToggle: some View {
         Menu {
             Button { appTheme = "system" } label: { Label("System", systemImage: "circle.lefthalf.filled") }
@@ -1134,6 +1348,17 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(theme.bg)
+                // Switching documents (watch mode, hooks) must rebuild scroll
+                // state: a long document followed to its bottom leaves an
+                // offset past a shorter successor's end, where the LazyVStack
+                // realizes no rows and scrollTo has no anchor — blank window.
+                // Same-file reloads keep their identity, and their position.
+                .id(model.fileURL)
+                .onChange(of: model.fileURL) { _ in
+                    // The fresh scroll view starts at the top; re-assert
+                    // follow once the new layout exists.
+                    if followTail { DispatchQueue.main.async { scrollToBottom(proxy) } }
+                }
                 .onChange(of: find.currentIndex) { _ in scrollToCurrentMatch(proxy) }
                 .onChange(of: find.matches) { _ in scrollToCurrentMatch(proxy) }
                 .onChange(of: model.parseTick) { _ in
@@ -1379,12 +1604,12 @@ struct MarginsApp: App {
                 .onAppear {
                     appDelegate.onOpenFiles = { urls in
                         if let firstURL = urls.first {
-                            model.openFile(firstURL)
+                            model.open(firstURL)
                         }
                     }
                 }
                 .onOpenURL { url in
-                    model.openFile(url)
+                    model.open(url)
                 }
                 // Every window shares the one ViewerModel, so a second window
                 // is only ever a clone of the first. Declaring that an open
@@ -1395,6 +1620,10 @@ struct MarginsApp: App {
                 .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
         }
         .commands {
+            CommandGroup(after: .newItem) {
+                Button("Watch Folder…") { model.pickFolderToWatch() }
+                    .keyboardShortcut("o", modifiers: [.command, .shift])
+            }
             CommandGroup(after: .pasteboard) {
                 Button("Copy Document as Markdown") {
                     setPasteboard(model.markdownSource)

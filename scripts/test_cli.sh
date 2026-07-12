@@ -53,6 +53,30 @@ set -e
 check "empty directory fails with exit 66" "66" "$code"
 check "empty directory error message" "margins: no Markdown files under $TMP/empty" "$err"
 
+check "--watch passes the directory through (no newest-md resolution)" \
+  "DRY $TMP" \
+  "$("$CLI" --watch "$TMP")"
+
+check "-w with no argument watches the current directory" \
+  "DRY ." \
+  "$("$CLI" -w)"
+
+check "-g and -w combine" \
+  "DRY -g $TMP" \
+  "$("$CLI" -g -w "$TMP")"
+
+check "--watch accepts a folder with no Markdown yet" \
+  "DRY $TMP/empty" \
+  "$("$CLI" --watch "$TMP/empty")"
+
+set +e
+err="$("$CLI" -w "$TMP/old.md" 2>&1)"
+code=$?
+set -e
+check "--watch rejects file arguments with exit 64" "64" "$code"
+check "--watch file-argument error message" \
+  "margins: --watch expects a directory, got $TMP/old.md" "$err"
+
 out="$(printf '# hi\n' | "$CLI" -)"
 check "stdin spools to a temp stdin.md" "stdin.md" "$(basename "${out#DRY }")"
 check "stdin content reaches the spool file" "# hi" "$(cat "${out#DRY }")"

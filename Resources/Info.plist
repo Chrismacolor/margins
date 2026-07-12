@@ -49,6 +49,22 @@
                 <string>mdown</string>
             </array>
         </dict>
+        <dict>
+            <!-- Folders enter watch mode (newest Markdown file, auto-switching).
+                 Claiming public.folder is what lets `open -b`/the CLI hand the
+                 app a directory; rank None keeps Margins out of Finder's
+                 "Open With" menu for every folder. -->
+            <key>CFBundleTypeName</key>
+            <string>Folder</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>None</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.folder</string>
+            </array>
+        </dict>
     </array>
 </dict>
 </plist>

@@ -8,6 +8,7 @@
 #
 #   margins <file.md> ...     open Markdown file(s) in Margins
 #   margins <dir> | margins . open the newest Markdown file under a directory
+#   margins -w [dir] ...      watch a folder (keep showing its newest Markdown)
 #   some-cmd | margins [-]    render piped Markdown, streaming as it arrives
 #   margins -g ...            open in the background (no focus steal)
 #   margins --help|--version
@@ -18,12 +19,16 @@ set -eu
 
 BUNDLE_ID="com.disanto.margins"
 OPEN_FLAGS=""
+WATCH=0
 
 usage() {
   cat <<'EOF'
 usage: margins <file.md> ...     open Markdown file(s) in Margins
        margins <dir>             open the newest Markdown file under <dir>
                                  (so `margins .` shows what an agent just wrote)
+       margins -w [dir]          watch a folder: Margins keeps showing its
+                                 newest Markdown file, switching as your agent
+                                 writes (default: the current directory)
        some-cmd | margins [-]    render piped Markdown (streams live as the
                                  pipe fills; turn on the Follow pill to keep
                                  the newest output in view)
@@ -69,11 +74,27 @@ newest_md() {
 while [ $# -gt 0 ]; do
   case "$1" in
     -g|--background) OPEN_FLAGS="-g"; shift ;;
+    -w|--watch) WATCH=1; shift ;;
     -h|--help) usage; exit 0 ;;
     --version) version; exit 0 ;;
     *) break ;;
   esac
 done
+
+# Watch mode: pass directories straight through — the app resolves (and keeps
+# resolving) the newest Markdown file itself. An empty folder is fine: the
+# viewer waits for the first Markdown file to appear.
+if [ "$WATCH" = "1" ]; then
+  [ $# -gt 0 ] || set -- .
+  for d in "$@"; do
+    if [ ! -d "$d" ]; then
+      printf 'margins: --watch expects a directory, got %s\n' "$d" >&2
+      exit 64
+    fi
+  done
+  open_app "$@"
+  exit 0
+fi
 
 if [ "${1:-}" = "-" ] || { [ $# -eq 0 ] && [ ! -t 0 ]; }; then
   # Spool stdin into a watched temp file. Open it first (empty), then append:

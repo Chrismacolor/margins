@@ -47,6 +47,7 @@ struct TestRunner {
         testFindMatches()
         testPlainText()
         testFrontmatter()
+        testFolderScan()
         benchmark()
 
         if failures > 0 {
