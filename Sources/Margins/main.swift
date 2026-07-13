@@ -1626,27 +1626,32 @@ struct MarginsApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model = ViewerModel()
     @StateObject private var find = FindModel()
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
-        WindowGroup {
+        // A single Window scene, not a WindowGroup: every window shares the
+        // one ViewerModel, so a second window could only ever be a clone of
+        // the first. WindowGroup + handlesExternalEvents reused an existing
+        // window for later opens, but lost the race at cold launch — opening
+        // a document from Finder created the default window AND an
+        // event-spawned duplicate. A unique Window makes that impossible and
+        // drops the pointless New Window menu item.
+        Window("Margins", id: "main") {
             ContentView(model: model, find: find)
                 .onAppear {
                     appDelegate.onOpenFiles = { urls in
                         if let firstURL = urls.first {
                             model.open(firstURL)
+                            // Re-surface the window if it was closed when the
+                            // open event arrived (app kept running).
+                            openWindow(id: "main")
                         }
                     }
                 }
                 .onOpenURL { url in
                     model.open(url)
+                    openWindow(id: "main")
                 }
-                // Every window shares the one ViewerModel, so a second window
-                // is only ever a clone of the first. Declaring that an open
-                // window prefers to handle external events (file opens, URLs)
-                // makes macOS reuse it instead of spawning a new scene per
-                // event — e.g. an editor hook re-opening the file on every
-                // save would otherwise stack up duplicate windows.
-                .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
         }
         .commands {
             CommandGroup(after: .appSettings) {

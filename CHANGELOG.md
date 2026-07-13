@@ -6,6 +6,12 @@ All notable changes to Margins are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- Opening a Markdown file from Finder while Margins wasn't running no longer
+  creates two windows showing the same document. The app is now a true
+  single-window app (it always behaved as one — extra windows were only ever
+  clones), which also removes the pointless "New Window" menu item.
+
 ## [1.2.0] - 2026-07-12
 
 ### Added
