@@ -12,8 +12,8 @@
 # zero-dependency).
 
 cask "margins" do
-  version "1.2.0"
-  sha256 "9dab684400a5ee6f684e7ade4fba9a6b30b8e5b34a14b14cd97e92b7140e1df6"
+  version "1.2.1"
+  sha256 "256e69cbc99ed4125bdf470546a4f1e0302a95fd8962602f9d705ca22f0b7084"
 
   url "https://github.com/Chrismacolor/margins/releases/download/v#{version}/Margins-#{version}.dmg"
   name "Margins"
