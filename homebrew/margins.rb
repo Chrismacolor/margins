@@ -25,6 +25,19 @@ cask "margins" do
   app "Margins.app"
   binary "#{appdir}/Margins.app/Contents/Resources/margins-cli", target: "margins"
 
+  caveats <<~EOS
+    Margins is signed and notarized, but Homebrew quarantines every download.
+    If you only ever launch Margins from an agent or the CLI (e.g. watch mode),
+    macOS never runs its first-open approval and may show a misleading
+    "Margins.app is damaged" dialog. It is not damaged — clear the quarantine:
+
+      xattr -dr com.apple.quarantine "#{appdir}/Margins.app"
+
+    To skip quarantine on future upgrades, install with:
+
+      brew install --cask --no-quarantine margins
+  EOS
+
   zap trash: [
     "~/Library/Preferences/com.disanto.margins.plist",
   ]

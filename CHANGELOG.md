@@ -6,6 +6,13 @@ All notable changes to Margins are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- Homebrew cask now explains the misleading "Margins.app is damaged" dialog
+  that agent/CLI-only users can hit after an upgrade (macOS never runs the
+  first-open approval on a programmatic launch). Added `caveats` with the
+  `xattr` recovery command and the `--no-quarantine` install option — the app
+  was never damaged; it's signed and notarized.
+
 ## [1.2.1] - 2026-07-12
 
 ### Fixed
