@@ -6,6 +6,16 @@ All notable changes to Margins are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-22
+
+### Added
+- **Quick Look preview**: press space on a `.md`/`.markdown`/`.mdown` file in
+  Finder (or Spotlight) to see it rendered in Margins' typography — headings,
+  code blocks, tables, callouts, task lists, frontmatter — without launching
+  the app. Follows the system light/dark appearance. Ships as a sandboxed
+  preview extension bundled inside the app; it shares the app's Markdown parser
+  but renders natively via AppKit (no web view).
+
 ### Fixed
 - Homebrew cask now explains the misleading "Margins.app is damaged" dialog
   that agent/CLI-only users can hit after an upgrade (macOS never runs the
