@@ -28,6 +28,10 @@ APP_NAME="Margins"
 APP_DIR="$ROOT_DIR/build/$APP_NAME.app"
 DIST_DIR="$ROOT_DIR/dist"
 ENTITLEMENTS="$ROOT_DIR/Resources/Margins.entitlements"
+# Nested Quick Look preview extension — signed inside-out (before the app) with
+# its own sandbox entitlements. See the signing step below.
+APPEX_DIR="$APP_DIR/Contents/PlugIns/MarginsQuickLook.appex"
+APPEX_ENTITLEMENTS="$ROOT_DIR/Resources/QuickLook/MarginsQuickLook.entitlements"
 
 VERSION="${VERSION:-$(git -C "$ROOT_DIR" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || true)}"
 VERSION="${VERSION:-0.0.0}"
@@ -49,13 +53,25 @@ echo "Signing identity: $DEVELOPER_ID"
 echo "==> Building optimized release (v$VERSION)"
 VERSION="$VERSION" "$SCRIPT_DIR/build_app.sh"
 
-# --- 2. Code sign with Hardened Runtime ---
-echo "==> Signing"
+# --- 2. Code sign with Hardened Runtime (inside-out) ---
+# Nested code must be signed BEFORE its container: the app's signature seals a
+# hash of the .appex, so signing the app first (or with --deep) would either
+# leave the extension unsigned or produce a signature that notarization rejects.
+# Sign the extension with its sandbox entitlements, then the app with its own.
+echo "==> Signing Quick Look extension"
+codesign --force --options runtime --timestamp \
+  --entitlements "$APPEX_ENTITLEMENTS" \
+  --sign "$DEVELOPER_ID" \
+  "$APPEX_DIR"
+
+echo "==> Signing app"
 codesign --force --options runtime --timestamp \
   --entitlements "$ENTITLEMENTS" \
   --sign "$DEVELOPER_ID" \
   "$APP_DIR"
-codesign --verify --strict --verbose=2 "$APP_DIR"
+
+# --deep re-verifies the nested extension's signature as part of the app's.
+codesign --verify --strict --deep --verbose=2 "$APP_DIR"
 
 mkdir -p "$DIST_DIR"
 

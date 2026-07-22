@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>MarginsQuickLook</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.disanto.margins.quicklook</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>MarginsQuickLook</string>
+    <!-- App extensions are XPC services: the package type is "XPC!", NOT "APPL".
+         quicklookd silently ignores a bundle with the wrong type. -->
+    <key>CFBundlePackageType</key>
+    <string>XPC!</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>NSExtension</key>
+    <dict>
+        <key>NSExtensionPointIdentifier</key>
+        <string>com.apple.quicklook.preview</string>
+        <!-- View-based provider: an NSViewController conforming to
+             QLPreviewingController. Swift class runtime name is
+             "<module>.<Class>"; build stamps -module-name MarginsQuickLook. -->
+        <key>NSExtensionPrincipalClass</key>
+        <string>MarginsQuickLook.PreviewViewController</string>
+        <key>NSExtensionAttributes</key>
+        <dict>
+            <!-- Claim Markdown ONLY. Deliberately NOT public.plain-text: the
+                 main app claims plain-text, but the preview must not hijack
+                 spacebar on every .txt file. -->
+            <key>QLSupportedContentTypes</key>
+            <array>
+                <string>net.daringfireball.markdown</string>
+            </array>
+            <key>QLSupportsSearchableItems</key>
+            <false/>
+        </dict>
+    </dict>
+</dict>
+</plist>

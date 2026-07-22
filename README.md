@@ -32,6 +32,8 @@ your agent so everything it writes simply appears, already rendered
 - **Tiny** — no vendored engines or JS payloads; the app bundle stays small.
 - **Private & offline** — your files never leave your machine; no analytics.
 - **Dark / light** — follows the macOS appearance, with a manual override.
+- **Quick Look** — press space on a `.md` in Finder to see it rendered in
+  Margins' typography, no app launch needed; follows the system light/dark.
 - **Live reload** — edits on disk update the view instantly (toggle in the header).
 - **Follow** — auto-scrolls as a file grows, so you can watch an AI tool write.
 - **Terminal-friendly** — a `margins` command opens files, piped output, or the
@@ -207,7 +209,8 @@ bounded. Parser benchmark (`scripts/test.sh`, Apple Silicon, release build):
 
 ## Architecture
 
-Four Swift files compiled into one binary:
+The app is four Swift files compiled into one binary, plus a Quick Look
+extension that shares the parser:
 
 - `Sources/Margins/MarkdownRenderer.swift` — a SwiftUI-free Markdown parser that
   produces theme-independent blocks (unit-testable standalone, and a theme switch
@@ -217,6 +220,9 @@ Four Swift files compiled into one binary:
   (newest-Markdown scan and switch rules).
 - `Sources/Margins/main.swift` — the SwiftUI app, theme, and views that apply
   colors/fonts at render time.
+- `Sources/MarginsQuickLook/` — the Quick Look preview extension (bundled as a
+  sandboxed `.appex`). Reuses `MarkdownRenderer` but renders natively via AppKit
+  (`NSAttributedString`), so previews look like the app without launching it.
 
 Tests live in `Tests/` and run via `swiftc` (no Swift Package Manager).
 

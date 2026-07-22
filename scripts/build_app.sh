@@ -58,4 +58,38 @@ if [[ -n "${BUILD:-}" ]]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$APP_DIR/Contents/Info.plist"
 fi
 
+# --- Quick Look preview extension (.appex) ---
+# A second, independently-compiled Mach-O target nested in Contents/PlugIns/.
+# It shares the SwiftUI-free parser (MarkdownRenderer.swift) with the app but
+# renders via AppKit (NSAttributedString), so it links QuickLookUI + AppKit,
+# NOT SwiftUI. App extensions have no main(); the executable entry point is
+# NSExtensionMain, forced with an explicit linker -e flag.
+QL_NAME="MarginsQuickLook"
+QL_SOURCE_DIR="$ROOT_DIR/Sources/$QL_NAME"
+QL_INFO_PLIST="$ROOT_DIR/Resources/QuickLook/Info.plist"
+APPEX_DIR="$APP_DIR/Contents/PlugIns/$QL_NAME.appex"
+APPEX_BIN_DIR="$APPEX_DIR/Contents/MacOS"
+mkdir -p "$APPEX_BIN_DIR"
+
+xcrun swiftc \
+  "$SWIFT_OPT" \
+  -parse-as-library \
+  -module-name "$QL_NAME" \
+  -target arm64-apple-macos13.0 \
+  -framework AppKit \
+  -framework QuickLookUI \
+  -Xlinker -e -Xlinker _NSExtensionMain \
+  "$QL_SOURCE_DIR"/*.swift \
+  "$SOURCE_DIR/MarkdownRenderer.swift" \
+  -o "$APPEX_BIN_DIR/$QL_NAME"
+chmod +x "$APPEX_BIN_DIR/$QL_NAME"
+
+cp "$QL_INFO_PLIST" "$APPEX_DIR/Contents/Info.plist"
+if [[ -n "${VERSION:-}" ]]; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APPEX_DIR/Contents/Info.plist"
+fi
+if [[ -n "${BUILD:-}" ]]; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$APPEX_DIR/Contents/Info.plist"
+fi
+
 echo "Built $APP_DIR (opt=$SWIFT_OPT, version=${VERSION:-unset}, build=${BUILD:-unset})"
